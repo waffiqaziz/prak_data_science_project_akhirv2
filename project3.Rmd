@@ -1,0 +1,91 @@
+---
+title: "Project3"
+author: "123190070 - 123190064"
+date: "4/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd(dirname(rstudioapi::getSourceEditorContext()$path)) # auto set directory
+
+library(tidymodels)
+library(tidytext)
+library(dplyr)
+```
+
+
+```{r}
+df <- read.csv("Coronavirus_Tweets.csv")
+df$TweetAt <- sub("-", "/", df$TweetAt)
+df$TweetAt <- sub("-", "/", df$TweetAt)
+df$TweetAt <- as.Date(df$TweetAt , format = "%d/%m/%y")
+# df = na.omit(df)
+```
+
+
+melihat jumlah tiap sentiment
+```{r}
+df %>%
+  group_by(Sentiment) %>% 
+  tally() %>% 
+  ggplot(aes(x=Sentiment, y=n, fill = Sentiment)) +
+  theme(axis.text.x = element_text(angle = 45)) +
+  geom_col()
+```
+
+sentimen yang bernilai extremely positive
+```{r}
+df %>%
+  filter(Sentiment == "Extremely Positive")
+```
+```{r}
+
+df %>%
+  group_by(TweetAt) %>% 
+  tally() %>%
+  ggplot(aes(x=TweetAt, y=n)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_x_date(breaks = df$TweetAt) + 
+  geom_bar(stat = "identity") 
+```
+
+
+show most world on location
+```{r}
+library(dplyr) # Data wrangling & manipulation
+library(tidytext) # For unnest_tokens
+library(stringr) # For managing text
+library(ggplot2) # For data visualizations & graphs
+
+text <- c(df$Location)
+text <- paste(text, collapse = " ")
+text <- str_replace_all(text, pattern = '\"', replacement = "") # Remove slashes
+text <- str_replace_all(text, pattern = '\n', replacement = "") # Remove \n
+text <- str_replace_all(text, pattern = '\u0092', replacement = "'") #Replace with quote
+text <- str_replace_all(text, pattern = '\u0091', replacement = "'") #Replace with quote
+
+text_df <- data_frame(Text = text) # tibble aka neater data frame
+text_words <- text_df %>% 
+  unnest_tokens(output = word, input = Text) 
+
+# data(stop_words) # Stop words.
+text_words  <- text_words  %>%
+  anti_join(stop_words) # Remove stop words in peter_words
+
+
+# Word Counts:
+text_wordcounts <- text_words  %>% count(word, sort = TRUE)
+
+head(text_wordcounts)
+```
+```{r}
+df$Tweets <- sapply(strsplit(as.character(df$OriginalTweet),split=' '),function(s) paste(s[!grepl('^@',s)],collapse=' ')) 
+df$Tweets <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) paste(s[!grepl('^https:',s)],collapse=' '))
+```
+
+
+

@@ -34,7 +34,14 @@ df %>%
   tally() %>% 
   ggplot(aes(x=Sentiment, y=n, fill = Sentiment)) +
   theme(axis.text.x = element_text(angle = 45)) +
-  geom_col()
+  geom_col() +
+  geom_text(
+    # label rata-rata dibulatkan tiga angka terakhir
+    aes(x = Sentiment, y = n, label = n), 
+    hjust = 0, size = 4,
+    position = position_dodge(width = 1),
+    inherit.aes = TRUE
+  ) 
 ```
 
 sentimen yang bernilai extremely positive
@@ -85,6 +92,15 @@ head(text_wordcounts)
 ```{r}
 df$Tweets <- sapply(strsplit(as.character(df$OriginalTweet),split=' '),function(s) paste(s[!grepl('^@',s)],collapse=' ')) 
 df$Tweets <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) paste(s[!grepl('^https:',s)],collapse=' '))
+```
+
+
+Menghilangkan kata yang mengandung https dan @
+```{r}
+df$OriginalTweet <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) paste(s[!grepl('^@',s)],collapse=' '))
+
+df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:@?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:https?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
 ```
 
 

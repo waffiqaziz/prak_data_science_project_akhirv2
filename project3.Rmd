@@ -12,9 +12,19 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 setwd(dirname(rstudioapi::getSourceEditorContext()$path)) # auto set directory
 
+# library(readr)
+library(tm)
+library(corpus)
 library(tidymodels)
-library(tidytext)
-library(dplyr)
+library(dplyr) # Data wrangling & manipulation
+library(tidytext) # For unnest_tokens
+library(stringr) # For managing text
+library(ggplot2) # For data visualizations & graphs
+
+# wordcloud
+library(wordcloud)
+library(RColorBrewer)
+
 ```
 
 
@@ -63,11 +73,6 @@ df %>%
 
 show most world on location
 ```{r}
-library(dplyr) # Data wrangling & manipulation
-library(tidytext) # For unnest_tokens
-library(stringr) # For managing text
-library(ggplot2) # For data visualizations & graphs
-
 text <- c(df$Location)
 text <- paste(text, collapse = " ")
 text <- str_replace_all(text, pattern = '\"', replacement = "") # Remove slashes
@@ -97,11 +102,43 @@ df$Tweets <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) past
 
 Menghilangkan kata yang mengandung https dan @
 ```{r}
-df$OriginalTweet <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) paste(s[!grepl('^@',s)],collapse=' '))
+df$Tweets <- sapply(strsplit(as.character(df$OriginalTweet),split=' '),function(s) paste(s[!grepl('^@',s)],collapse=' '))
 
 df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:@?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
-df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:https?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:https?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+
+# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:amp?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[\r\n]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[[:punct:]]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
 ```
+
+world cloud
+```{r}
+docs <- Corpus(VectorSource(df$Tweets))
+
+docs <- docs %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removePunctuation) %>% #Remove commas etc.
+  tm_map(stripWhitespace) %>%
+  tm_map(stemDocument)
+docs <- tm_map(docs, content_transformer(tolower))
+
+# menghilangkan konjungsi
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+wordcloud(docs
+        # , scale=c(5,0.5)     # Set min and max scale
+        , max.words=1000     # Set top n words
+        , random.order=FALSE # Words in decreasing freq
+        , rot.per=0.35       # % of vertical words
+        , use.r.layout=FALSE # Use C++ collision detection
+        , colors=brewer.pal(8, "Dark2"))
+```
+
+
+
+
+
 
 
 

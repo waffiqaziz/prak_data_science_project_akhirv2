@@ -13,8 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 setwd(dirname(rstudioapi::getSourceEditorContext()$path)) # auto set directory
 
 # library(readr)
-library(tm)
-library(corpus)
+library(tm) # pre-prosessing data
+library(corpus) # fungsi corpus
 library(tidymodels)
 library(dplyr) # Data wrangling & manipulation
 library(tidytext) # For unnest_tokens
@@ -25,10 +25,14 @@ library(ggplot2) # For data visualizations & graphs
 library(wordcloud)
 library(RColorBrewer)
 
-library(data.table) #library untuk mengubah dataframe to table
+# library(data.table) #library untuk mengubah dataframe to table
 
 # library shiny
 library(shiny)
+
+# library LDA
+library(topicmodels)
+library(reshape2)
 ```
 
 
@@ -123,12 +127,12 @@ df$Tweets <- sapply(strsplit(as.character(df$Tweets),split=' '),function(s) past
 
 df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:@?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
 
-# coba gunakan peritnh dibawah jika masih terdapat kata yang tidak perlu
+# gunakan perintah dibawah jika masih terdapat kata yang tidak perlu
 # df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:https?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
-
-# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:amp?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
-# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[\r\n]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
-# df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[[:punct:]]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+  # 
+  # df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:amp?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+  # df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[\r\n]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
+  # df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[[:punct:]]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
 ```
 
 world cloud
@@ -208,10 +212,10 @@ unsupervised %>%
 
 rf-idf
 ```{r}
-# unsupervised <- unsupervised %>% 
-#   count(Sentiment,word,sort = TRUE) %>% 
-#   bind_tf_idf(word, Sentiment,n)
-# unsupervised
+unsupervised <- unsupervised %>%
+  count(Sentiment,word,sort = TRUE) %>%
+  bind_tf_idf(word, Sentiment,n)
+unsupervised
 ```
 
 
@@ -222,16 +226,82 @@ covid_dtm <- unsupervised %>%
   cast_dtm(Sentiment,word,n)
 covid_dtm
 ```
+
 ```{r}
-# covid_lda <- LDA(covid_dtm, k=5)
-# covid_lda
+covid_lda <- LDA(covid_dtm,k=5)
+covid_lda
 ```
 
-SHINY
+```{r}
+covid_gamma <- covid_lda %>% 
+  tidy(matrix = "gamma") %>% 
+  rename(Sentiment = document) %>% 
+  arrange(Sentiment, desc(gamma))
+
+covid_gamma
+```
+
+```{r}
+covid_gamma %>% 
+  ggplot(aes(x = rev(Sentiment), y = gamma, fill = factor(topic))) +
+  geom_col() +
+  coord_flip()
+```
+
+```{r}
+covid_beta <- covid_lda %>% 
+  tidy(matrix = "beta") %>% 
+  rename(word = term) %>% 
+  arrange(topic, desc(beta))
+
+covid_beta
+
+covid_beta %>% 
+  group_by(topic) %>% 
+  head(10, beta)
+```
+
+```{r}
+covid_beta %>% 
+  filter(topic == 1) %>%
+  head(10,topic) %>% 
+  ggplot(aes(x=reorder(word,beta), y= beta))+
+  geom_col()+
+  coord_flip()+
+  labs(
+    x = "",
+    y = expression(beta),
+    title = "Kata Kunci Topic 1 Sentimen"
+  )+
+  theme_bw()
+```
+
+```{r}
+covid_beta %>% 
+  filter(topic == 2) %>%
+  head(10,topic) %>% 
+  ggplot(aes(x=reorder(word,beta), y= beta))+
+  geom_col()+
+  coord_flip()+
+  labs(
+    x = "",
+    y = expression(beta),
+    title = "Kata Kunci Topic 2 Sentimen"
+  )+
+  theme_bw()
+```
+
+
 ```{r}
 ui <- shinyUI(
   navbarPage("Analisis Sentimen",
-             tabPanel("Jumlah Sentimet",
+             tabPanel("Tabel",
+                      mainPanel(
+                        h2("Tabel Data Tweets Covid-19", align = "center"),
+                        dataTableOutput('table')
+                      )
+             ),
+             tabPanel("Jumlah Sentiment",
                       mainPanel(
                         h2("Jumlah Tiap Sentiment", align = "center"),
                         plotOutput(outputId = "plot1"),width = "100%")
@@ -263,19 +333,20 @@ ui <- shinyUI(
 )
 
 server <- function(input, output) {
-  output$plot1 <-renderPlot({
+  output$table <-renderDataTable(df) # tabel tweets
+  output$plot1 <-renderPlot({ # plot jumlah sentimen
     plot(p1)
   })
-  output$plot2 <-renderPlot({
+  output$plot2 <-renderPlot({ # plot tweets jumlah harian
     plot(p2)
   })
-  output$plot3 <-renderPlot({
+  output$plot3 <-renderPlot({ # plot lokasi tweets
     plot(p3)
   })
-  output$plot4 <-renderPlot({
+  output$plot4 <-renderPlot({ # plot jumlah kata
     plot(p4)
   })
-  output$worldcloud <-renderPlot({
+  output$worldcloud <-renderPlot({  # plot word cloud
     wordcloud(docs
                        , max.words=500    # Set top n words
                        , random.order=FALSE # Words in decreasing freq
@@ -283,16 +354,9 @@ server <- function(input, output) {
                        , use.r.layout=FALSE # Use C++ collision detection
                        , colors=brewer.pal(8, "Dark2"))
   })
-  
-  # output$table1 <- renderTable({
-  #   table
-  #   table(df %>% head(10)
-  #         )
-  # })
-  output$table1 <- renderTable(df)
 }
 
-shinyApp(ui, server)
+shinyApp(ui, server) #tampilkan dalam shiny
 ```
 
 

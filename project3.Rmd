@@ -1,5 +1,5 @@
 ---
-title: "Project3"
+title: "Sentimen_Analisis_Covid-19_tweets"
 author: "123190070 - 123190064"
 date: "4/12/2021"
 output: html_document
@@ -18,34 +18,25 @@ library(corpus) # fungsi corpus
 library(tidymodels)
 library(dplyr) # Data wrangling & manipulation
 library(tidytext) # For unnest_tokens
-library(stringr) # For managing text
 library(ggplot2) # For data visualizations & graphs
 
 # wordcloud
 library(wordcloud)
 library(RColorBrewer)
 
-# library(data.table) #library untuk mengubah dataframe to table
-
 # library shiny
 library(shiny)
-
-# library LDA
-library(topicmodels)
-library(reshape2)
 ```
 
 
+1. PENGUMPULAN DATASET 
 ```{r}
 df <- read.csv("Coronavirus_Tweets.csv")
-df$TweetAt <- sub("-", "/", df$TweetAt)
-df$TweetAt <- sub("-", "/", df$TweetAt)
-df$TweetAt <- as.Date(df$TweetAt , format = "%d/%m/%y")
-# df = na.omit(df)
+
+df
 ```
 
-
-melihat jumlah tiap sentiment
+2. melihat jumlah tiap sentiment
 ```{r}
 p1 <- df %>%
   group_by(Sentiment) %>% 
@@ -64,10 +55,19 @@ p1 <- df %>%
 p1
 ```
 
-sentimen yang bernilai extremely positive
+2. sentimen yang bernilai extremely positive
 ```{r}
-df %>%
+ep<-df %>%
   filter(Sentiment == "Extremely Positive")
+ep
+```
+
+3. DATA CLEANSING
+```{r}
+df$TweetAt <- sub("-", "/", df$TweetAt)
+df$TweetAt <- sub("-", "/", df$TweetAt)
+df$TweetAt <- as.Date(df$TweetAt , format = "%d/%m/%y")
+df = na.omit(df)
 ```
 
 Jumlah Tweets dalam Satu Hari
@@ -82,41 +82,6 @@ p2 <-df %>%
 p2
 ```
 
-
-show most world on location
-```{r}
-text <- c(df$Location)
-text <- paste(text, collapse = " ")
-text <- str_replace_all(text, pattern = '\"', replacement = "") # Remove slashes
-text <- str_replace_all(text, pattern = '\n', replacement = "") # Remove \n
-text <- str_replace_all(text, pattern = '\u0092', replacement = "'") #Replace with quote
-text <- str_replace_all(text, pattern = '\u0091', replacement = "'") #Replace with quote
-
-text_df <- data_frame(Text = text) # tibble aka neater data frame
-text_words <- text_df %>% 
-  unnest_tokens(output = word, input = Text) 
-
-# data(stop_words) # Stop words.
-text_words  <- text_words  %>%
-  anti_join(stop_words) # Remove stop words in peter_words
-```
-
-
-```{r}
-# Word Counts:
-text_worldcounts <- text_words  %>% count(word, sort = TRUE)
-p3 <- text_worldcounts %>% 
-  arrange(desc(n)) %>% 
-  head(6) %>% 
-  ggplot(aes(x=n,y=word))+
-  geom_col() + ylab("Location") +
-  theme(axis.text = element_text(size=12,
-                                 color = "black"),
-        legend.text = element_text(size=12))
-
-head(text_worldcounts)
-p3
-```
 
 Menghilangkan kata yang mengandung https dan @
 ```{r}
@@ -135,7 +100,43 @@ df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:@?|<filter>)(?!\\w)\\S*", "", df$Twe
   # df$Tweets <- gsub("(?:\\s+|^)\\S*(?<!\\w)(?:[[:punct:]]?|<filter>)(?!\\w)\\S*", "", df$Tweets, perl=TRUE)
 ```
 
-world cloud
+Pre-processing kolom Location
+```{r}
+text <- c(df$Location)
+text <- paste(text, collapse = " ")
+text <- str_replace_all(text, pattern = '\"', replacement = "") # Remove slashes
+text <- str_replace_all(text, pattern = '\n', replacement = "") # Remove \n
+text <- str_replace_all(text, pattern = '\u0092', replacement = "'") #Replace with quote
+text <- str_replace_all(text, pattern = '\u0091', replacement = "'") #Replace with quote
+
+text_df <- data_frame(Text = text) # tibble aka neater data frame
+text_words <- text_df %>% 
+  unnest_tokens(output = word, input = Text) #tokenisasi
+
+# data(stop_words) # Stop words.
+text_words  <- text_words  %>%
+  anti_join(stop_words) # Remove stop words in peter_words
+```
+
+Mengambil data yang sudah ter tokenisasi
+```{r}
+# Word Counts:
+text_worldcounts <- text_words  %>% count(word, sort = TRUE)
+p3 <- text_worldcounts %>% 
+  arrange(desc(n)) %>% 
+  head(6) %>% 
+  ggplot(aes(x=n,y=word))+
+  geom_col() + ylab("Location") +
+  theme(axis.text = element_text(size=12,
+                                 color = "black"),
+        legend.text = element_text(size=12))
+
+head(text_worldcounts)
+p3
+```
+
+
+Pre-processing data untuk word cloud
 ```{r}
 docs <- Corpus(VectorSource(df$Tweets))
 
@@ -150,18 +151,20 @@ docs <- tm_map(docs, content_transformer(tolower))
 # menghilangkan konjungsi
 docs <- tm_map(docs, removeWords, stopwords("english"))
 ```
+
+Menampilkan word cloud
 ```{r}
-# set.seed(1234) # for reproducibility 
+# set.seed(1234) # for reproducibility
 wordcloud1 <- wordcloud(docs
                        , max.words=500    # Set top n words
                        , random.order=FALSE # Words in decreasing freq
                        , rot.per=0.35       # % of vertical words
                        , use.r.layout=FALSE # Use C++ collision detection
                        , colors=brewer.pal(8, "Dark2"))
+
 ```
 
-
-
+Pre-processing data untuk melihat kata paling banyak
 ```{r}
 words <- df$Tweets
 
@@ -174,12 +177,10 @@ words <- words %>%
   count(word, sort = TRUE)
 
 words = na.omit(words) #hapus baris yang kososng
-
-
-# words <- gsub("[0-9]+", "", words$word) 
 ```
 
-Plot top words
+
+Plot 10 kata terbanyak
 ```{r}
 p4 <- words %>% 
   filter(n > 2000) %>% 
@@ -195,110 +196,13 @@ p4 <- words %>%
 p4
 ```
 
-unsupervised
-```{r}
-unsupervised <- df %>% 
-  filter(!is.na(Tweets)) %>% 
-  group_by(Sentiment) %>% 
-  unnest_tokens(word,Tweets) %>% 
-  ungroup() %>% 
-  anti_join(stop_words)
-unsupervised
-```
-```{r}
-unsupervised %>% 
-  count(Sentiment,word,sort = TRUE)
-```
-
-rf-idf
-```{r}
-unsupervised <- unsupervised %>%
-  count(Sentiment,word,sort = TRUE) %>%
-  bind_tf_idf(word, Sentiment,n)
-unsupervised
-```
-
-
-
-```{r}
-covid_dtm <- unsupervised %>% 
-  count(Sentiment,word) %>% 
-  cast_dtm(Sentiment,word,n)
-covid_dtm
-```
-
-```{r}
-covid_lda <- LDA(covid_dtm,k=5)
-covid_lda
-```
-
-```{r}
-covid_gamma <- covid_lda %>% 
-  tidy(matrix = "gamma") %>% 
-  rename(Sentiment = document) %>% 
-  arrange(Sentiment, desc(gamma))
-
-covid_gamma
-```
-
-```{r}
-covid_gamma %>% 
-  ggplot(aes(x = rev(Sentiment), y = gamma, fill = factor(topic))) +
-  geom_col() +
-  coord_flip()
-```
-
-```{r}
-covid_beta <- covid_lda %>% 
-  tidy(matrix = "beta") %>% 
-  rename(word = term) %>% 
-  arrange(topic, desc(beta))
-
-covid_beta
-
-covid_beta %>% 
-  group_by(topic) %>% 
-  head(10, beta)
-```
-
-```{r}
-covid_beta %>% 
-  filter(topic == 1) %>%
-  head(10,topic) %>% 
-  ggplot(aes(x=reorder(word,beta), y= beta))+
-  geom_col()+
-  coord_flip()+
-  labs(
-    x = "",
-    y = expression(beta),
-    title = "Kata Kunci Topic 1 Sentimen"
-  )+
-  theme_bw()
-```
-
-```{r}
-covid_beta %>% 
-  filter(topic == 2) %>%
-  head(10,topic) %>% 
-  ggplot(aes(x=reorder(word,beta), y= beta))+
-  geom_col()+
-  coord_flip()+
-  labs(
-    x = "",
-    y = expression(beta),
-    title = "Kata Kunci Topic 2 Sentimen"
-  )+
-  theme_bw()
-```
-
-
 ```{r}
 ui <- shinyUI(
   navbarPage("Analisis Sentimen",
              tabPanel("Tabel",
                       mainPanel(
                         h2("Tabel Data Tweets Covid-19", align = "center"),
-                        dataTableOutput('table')
+                        dataTableOutput('table'),width = "100%"
                       )
              ),
              tabPanel("Jumlah Sentiment",
@@ -358,5 +262,3 @@ server <- function(input, output) {
 
 shinyApp(ui, server) #tampilkan dalam shiny
 ```
-
-
